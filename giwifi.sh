@@ -38,7 +38,6 @@ mywget() {
         #log "${res}" #第一次返回的是get的html元素,非常占空间,故注释掉了
         echo "${res}"
     fi
-
 }
 
 urlencode() {
