@@ -36,7 +36,7 @@ opkg install openssl-util
 
 获取最新版脚本
 ```
-wget https://github.com/GiraffeLe/GiwifiScript/releases/download/$(curl -Ls "https://api.github.com/repos/Giraffele/GiwifiScript/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')/giwifi.sh
+wget https://raw.githubusercontent.com/GiraffeLe/GiwifiScript/master/giwifi.sh
 ```
 
 
