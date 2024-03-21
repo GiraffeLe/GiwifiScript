@@ -1,24 +1,24 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
 # Usage:  <username> <password> [baseurl]
 cd $(
     cd "$(dirname "$0")"
     pwd
 )
-pwd=$(pwd)
 
 UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.5.1.4 Safari/537.36"
 baseUrl="http://10.53.1.3"
-log_file="giwifi.log"
+LOG_FILE="giwifi.log"
 # 1 为开 0为关 日志
-log_flag=1
+LOG_FLAG=1
 
 log() {
-    if [ $log_flag -eq 1 ]; then
+    if [ $LOG_FLAG -eq 1 ]; then
         local datetime=$(date +'%Y-%m-%d %H:%M:%S')
         local script_name=$(basename "$0")
         local message="$@"
 
-        echo "[$datetime] [$script_name] - $message" >>"$log_file"
+        echo "[$datetime] [$script_name] - $message" >>"$LOG_FILE"
     fi
 
 }
@@ -30,14 +30,16 @@ if [ "$#" -eq 3 ]; then
 fi
 
 mywget() {
-    log "$@"
-    res=$(wget $@ -q -O- -U "$UA" --timeout 2 --tries 2)
-    if [ -z "$res" ]; then
-        log "$baseUrl timeout"
+    log "wget" "$@" "$UA"
+    resp_file=$(mktemp)
+    if wget "$@" -qO $resp_file -U "$UA" --timeout 2 --tries 2; then
+        # 请求成功，返回响应体
+        cat $resp_file
     else
-        #log "${res}" #第一次返回的是get的html元素,非常占空间,故注释掉了
-        echo "${res}"
+        # 请求失败，输出错误信息到日志
+        log "wget error" $(cat $resp_file)
     fi
+    rm $resp_file
 }
 
 urlencode() {
@@ -50,7 +52,10 @@ urlencode() {
         c=${string:$pos:1}
         case "$c" in
         [-_.~a-zA-Z0-9]) o="${c}" ;;
-        *) printf -v o '%%%02x' "'$c" ;;
+        *)
+            printf -v o '%%%02x' "'$c"
+            o=$(echo $o | tr 'a-z' 'A-Z') # 小写字母转大写
+            ;;
         esac
         encoded+="${o}"
     done
@@ -104,17 +109,35 @@ aes_128_cbc() {
     hex2str $hex_data_padding | openssl enc -aes-128-cbc -e -K $hex_key -iv $hex_iv -nopad -base64 -A
 }
 
-# 从登录页拿到param
+# 请求登录页面
+get() {
+    mywget "$baseUrl""/gportal/web/login"
+}
+
+# 从$1拿到param $1 为html文本
 get_param_from_page() {
 
-    #字符串urlencode
+    # 形如 xxx=yyy 的字符'='两边urlencode
+    line_urlencode() {
+        params_urlencode() {
+            echo $(urlencode $1)"="$(urlencode $2)
+        }
+        while read line; do
+            new_line=$(echo $line |
+                awk -F '=' '{
+                print $1 " " $2
+                }')
+            echo $(params_urlencode $new_line)
+        done
+    }
 
-    # 获取登录页html
-    html=$(mywget "$baseUrl""/gportal/web/login")
-    # 从表单中拿到所有input name value 并序列化
-    param=$(echo $html | grep -o '<input[^>]*>' | grep -o 'name=\".*\" \([\w]*\(=\".*\"\)\? \)*value\(=\"[^\"]*\"\)\?' | sed 's/ .* / /g' | sed 's/name=\"\([^"]*\)\" value\(=\"\([^\"]*\)\"\)\?/\1=\3/g' | awk '{printf("%s&", $0)}' | sed 's/&$//')
-    # 删去name password
-    echo $param | sed 's/\(\&name=\)\(\&password=\)//g'
+    # 从htmln拿到表单，然后拿到所有input name value 并序列化
+    echo $1 | grep -o '<form id=\"frmLogin\"[^>]*>.*</form>' | sed 's/<\/form>.*//' |                   # 拿到第一个form标签内文本
+        grep -o '<input[^>]*>' | grep -o 'name=\".*\" \([\w]*\(=\".*\"\)\? \)*value\(=\"[^\"]*\"\)\?' | # 拿到所有inout标签
+        sed 's/ .* / /g' | sed 's/name=\"\([^"]*\)\" value\(=\"\([^\"]*\)\"\)\?/\1=\3/g' |              # 拿到带name value属性的input 并以name=value形式返回
+        line_urlencode |                                                                                # 每行urlencode
+        awk '{printf("%s&", $0)}' | sed 's/&$//' |                                                      # &连接并去除最后一个&
+        sed 's/\(\&name=\)\(\&password=\)//g'                                                           # 去掉最后的name及password
 }
 
 # $1 json文本
@@ -139,12 +162,18 @@ queryAuthState() {
 
 # $1 username $2 password
 login() {
-    myparam=$(get_param_from_page)
-    sleep 1
+    html=$(get)
+    if [ -z "$html" ]; then
+        log "get nothing"
+        exit 1
+    fi
+    myparam=$(get_param_from_page "$html")
+    if [ -z "myparam" ]; then
+        log "parse error"
+        exit 1
+    fi
     myparam=$myparam"&name=""$(urlencode $1)""&password=""$(urlencode $2)"
     echo $(post $myparam)
-    sleep 1
-    echo $(queryAuthState $myparam)
 }
 
 ## 从这里开始主执行顺序
