@@ -8,6 +8,7 @@ cd $(
 
 UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.5.1.4 Safari/537.36"
 baseUrl="http://10.53.1.3"
+
 LOG_FILE="giwifi.log"
 # 1 为开 0为关 日志
 LOG_FLAG=1
@@ -28,11 +29,13 @@ if [ "$#" -eq 3 ]; then
     baseUrl=$3
     log "use baseurl:$baseUrl"
 fi
-
+first_page=$baseUrl'/gportal/web/login'
+post_url=$baseUrl'/gportal/web/authLogin?round=114'
+state_url=$baseUrl'/gportal/web/queryAuthState'
 mywget() {
     log "wget" "$@" "$UA"
     resp_file=$(mktemp)
-    if wget "$@" -qO $resp_file -U "$UA" --timeout 2 --tries 2; then
+    if wget "$@" -qO $resp_file -U "$UA" --header "Origin:"$baseUrl --timeout 2 --tries 2; then
         # 请求成功，返回响应体
         cat $resp_file
     else
@@ -111,7 +114,7 @@ aes_128_cbc() {
 
 # 请求登录页面
 get() {
-    mywget "$baseUrl""/gportal/web/login"
+    mywget $first_page
 }
 
 # 从$1拿到param $1 为html文本
@@ -149,14 +152,15 @@ get_status() {
 post() {
     iv=$(echo $1 | grep -o 'iv=[^\&]*' | sed 's/iv=//g')
     data=$(aes_128_cbc $1 "1234567887654321" $iv)
-    result=$(mywget "$baseUrl""/gportal/web/authLogin?round=114" --post-data "data="$(urlencode $data)"&iv=$iv" --header "Content-Type:application/x-www-form-urlencoded")
+    msg="data="$(urlencode $data)"&iv=$iv"
+    result=$(mywget $post_url --post-data $msg --header "Content-Type:application/x-www-form-urlencoded; charset=UTF-8" --header "Referer:$first_page")
     get_status "$result"
 }
 
 # $1 param
 queryAuthState() {
     sign=$(echo $1 | grep -o 'sign=[^\&]*' | sed 's/sign=//g')
-    result=$(mywget "$baseUrl""/gportal/web/queryAuthState" --post-data "sign=$sign" --header "Content-Type:application/x-www-form-urlencoded")
+    result=$(mywget $state_url --post-data "sign=$sign" --header "Content-Type:application/x-www-form-urlencoded; charset=UTF-8")
     get_status "$result"
 }
 
