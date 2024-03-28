@@ -29,11 +29,15 @@ if [ "$#" -eq 3 ]; then
     baseUrl=$3
     log "use baseurl:$baseUrl"
 fi
+
 first_page=$baseUrl'/gportal/web/login'
-post_url=$baseUrl'/gportal/web/authLogin?round=114'
+post_url=$baseUrl'/gportal/web/authLogin?round='${RANDOM::3}
 state_url=$baseUrl'/gportal/web/queryAuthState'
+logout_url=$baseUrl'/gportal/web/authLogout'
+test_url="http://nettest.gwifi.com.cn"
+
 mywget() {
-    log "wget" "$@" "$UA"
+    log "wget" "$@" "-U" "$UA"
     resp_file=$(mktemp)
     if wget "$@" -qO $resp_file -U "$UA" --header "Origin:"$baseUrl --timeout 2 --tries 2; then
         # 请求成功，返回响应体
@@ -117,8 +121,8 @@ get() {
     mywget $first_page
 }
 
-# 从$1拿到param $1 为html文本
-get_param_from_page() {
+# 从$1拿到param $1 为html文本 $2 form的id
+get_form_input_from_page() {
 
     # 形如 xxx=yyy 的字符'='两边urlencode
     line_urlencode() {
@@ -135,7 +139,7 @@ get_param_from_page() {
     }
 
     # 从htmln拿到表单，然后拿到所有input name value 并序列化
-    echo $1 | grep -o '<form id=\"frmLogin\"[^>]*>.*</form>' | sed 's/<\/form>.*//' |                   # 拿到第一个form标签内文本
+    echo $1 | grep -o '<form id=\"'$2'\"[^>]*>.*</form>' | sed 's/<\/form>.*//' |                       # 拿到第一个form标签内文本
         grep -o '<input[^>]*>' | grep -o 'name=\".*\" \([\w]*\(=\".*\"\)\? \)*value\(=\"[^\"]*\"\)\?' | # 拿到所有inout标签
         sed 's/ .* / /g' | sed 's/name=\"\([^"]*\)\" value\(=\"\([^\"]*\)\"\)\?/\1=\3/g' |              # 拿到带name value属性的input 并以name=value形式返回
         line_urlencode |                                                                                # 每行urlencode
@@ -143,9 +147,9 @@ get_param_from_page() {
         sed 's/\(\&name=\)\(\&password=\)//g'                                                           # 去掉最后的name及password
 }
 
-# $1 json文本
-get_status() {
-    echo $1 | sed -n 's/.*\"status\": \([0-9]*\)[^}]*}/\1/p'
+# $1 json文本 $2 字段
+json_get() {
+    echo $1 | sed -n 's/.*\"'$2'\":[ ]*\([0-9]*\)[^},]*[,}].*/\1/p'
 }
 
 # $1 param
@@ -154,29 +158,58 @@ post() {
     data=$(aes_128_cbc $1 "1234567887654321" $iv)
     msg="data="$(urlencode $data)"&iv=$iv"
     result=$(mywget $post_url --post-data $msg --header "Content-Type:application/x-www-form-urlencoded; charset=UTF-8" --header "Referer:$first_page")
-    get_status "$result"
+    json_get "$result" "status"
 }
 
 # $1 param
 queryAuthState() {
     sign=$(echo $1 | grep -o 'sign=[^\&]*' | sed 's/sign=//g')
     result=$(mywget $state_url --post-data "sign=$sign" --header "Content-Type:application/x-www-form-urlencoded; charset=UTF-8")
-    get_status "$result"
+    json_get "$result" "status"
+}
+
+checkAccessInternet() {
+    result=$(mywget $test_url)
+    # json_get $result 'resultCode'
+    if [ -n "$internetCheck" ]; then
+        # online
+        echo 1
+    else
+        echo 0
+    fi
+}
+
+# $1 html文本
+logout() {
+    data=$(get_form_input_from_page "$1" "frmLogout")
+    result=$(mywget $logout_url --post-data "$data" --header "Content-Type:application/x-www-form-urlencoded; charset=UTF-8")
+    json_get "$result" "status"
 }
 
 # $1 username $2 password
 login() {
+
     html=$(get)
     if [ -z "$html" ]; then
         log "get nothing"
         exit 1
     fi
-    myparam=$(get_param_from_page "$html")
+    myparam=$(get_form_input_from_page "$html" "frmLogin")
     if [ -z "myparam" ]; then
         log "parse error"
         exit 1
     fi
     myparam=$myparam"&name=""$(urlencode $1)""&password=""$(urlencode $2)"
+
+    authState=$(queryAuthState)
+    if [ $authState -eq 1 ]; then
+        # online
+        log "already online"
+        logoutBack=$(logout "$html")
+        if [ $logoutBack -eq 1 ]; then
+            log "logout success"
+        fi
+    fi
     echo $(post $myparam)
 }
 
