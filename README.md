@@ -27,9 +27,10 @@ Node版见:[这里(本人写的)](https://github.com/GiraffeLe/Auto-Giwifi)
 
 # 配置
 
-路由器上面需要安装`wget-ssl`(自带的`uclient-fetch`指令不全,会报错)和`openssl-util`
+路由器上面需要安装`bash`(脚本中存在busybox的shell不支持的语法)、`wget-ssl`(自带的`uclient-fetch`指令不全,会报错)和`openssl-util`
 ```
 opkg update
+opkg install bash
 opkg install wget-ssl
 opkg install openssl-util
 ```
