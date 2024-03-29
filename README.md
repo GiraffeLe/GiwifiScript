@@ -1,10 +1,10 @@
-目前已在虚拟机上测试成功,路由器尚未测试.
-
 # 介绍
 
 这是一个能够自动登录GiWifi校园网的shell脚本.
 
+配合[UA2F](https://github.com/Zxilly/UA2F)或者[UA3F](https://github.com/SunBK201/UA3F)体验更佳
 
+---
 原作者: [TwiceTry](https://github.com/TwiceTry)
 
 Node版见:[这里(本人写的)](https://github.com/GiraffeLe/Auto-Giwifi)
@@ -17,6 +17,12 @@ Node版见:[这里(本人写的)](https://github.com/GiraffeLe/Auto-Giwifi)
 
 # 使用
 
+先赋予权限
+```
+chmod +x giwifi.sh
+```
+
+然后(不给权限直接执行的话会提示`./giwifi.sh: Permission denied`)
 ```bash
 ./giwifi.sh <username> <password> [baseUrl]
 ```
@@ -27,10 +33,11 @@ Node版见:[这里(本人写的)](https://github.com/GiraffeLe/Auto-Giwifi)
 
 # 配置
 
-路由器上面需要安装`wget-ssl`(自带的`uclient-fetch`指令不全,会报错)和`openssl-util`
+路由器上面需要安装`wget-ssl`,`bash`(路由器自带的均为精简版,指令不全,会出现问题)和`openssl-util`
 ```
 opkg update
 opkg install wget-ssl
+opkg install bash
 opkg install openssl-util
 ```
 
