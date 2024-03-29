@@ -33,11 +33,13 @@ chmod +x giwifi.sh
 
 # 配置
 
+
 路由器上面需要安装`wget-ssl`,`bash`(路由器自带的均为精简版,指令不全,会出现问题)和`openssl-util`
+
 ```
 opkg update
-opkg install wget-ssl
 opkg install bash
+opkg install wget-ssl
 opkg install openssl-util
 ```
 
@@ -45,6 +47,10 @@ opkg install openssl-util
 ```
 wget https://raw.githubusercontent.com/GiraffeLe/GiwifiScript/master/giwifi.sh
 ```
+
+# 脚本执行流程
+
+![image](https://mermaid.ink/svg/pako:eNptkcFKw0AURX-lvHX7A1m4UtzUTbvTcTE002QgmanpBJG2UMWVRStoBTVWiosWcSGCVqzSn3GS-Be-dFJ14e5x597zLvNaUJM2AwvqntytuTRQhXKFiEKhqnDeIqDfu3rcI7CdiaXSSptAengVRw-6fxAPHtOTqe5fEGhX2E7ImlnCSMnlTH8MvkbPrvK9PJ57csr4Lh6e1gPfkw4X6WiijwfIWWcKVyv2A9LRJHmbJ0cvcXc_5yw9BqSnT8aD6bJ0ZJiV-HztLZSF36joLmer8NWU-33lwqCMnszO4mGUzs_19RCZa8LOIije3P5bII7u_xbggggogs8Cn3Ibv7aVRQgol_mMgIWjxx1XESCig0YaKlndEzWwVBCyIoQNG9GrnDoB9cGqU6-JKrO5ksGGOdbiZkVoULEp5dLT-QbYfsmr "脚本执行流程")
 
 
 
